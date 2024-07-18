@@ -1,83 +1,80 @@
-from __future__ import print_function
-import os.path
+import os
+import pickle
 import json
-import google.auth
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
-
+# Function to authenticate and build the service
 def authenticate():
-
+    SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
     creds = None
-
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-
+    
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'Netflix_Assessment.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
 
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+    service = build('drive', 'v3', credentials=creds)
+    return service
 
-    return creds
-
-def count_child_objects(service, folder_id):
-    total_files = 0
-    total_folders = 0
-
-    query = f"'{folder_id}' in parents and trashed = false"
-    results = service.files().list(q=query, fields="files(id, mimeType)").execute()
+# Function to get all child objects recursively
+def get_child_objects(service, folder_id):
+    query = f"'{folder_id}' in parents and trashed=false"
+    results = service.files().list(q=query, fields="files(id, name, mimeType)").execute()
     items = results.get('files', [])
-
+    
+    child_objects_count = 0
+    nested_folders_count = 0
+    
     for item in items:
-        total_files += 1
+        child_objects_count += 1
         if item['mimeType'] == 'application/vnd.google-apps.folder':
-            total_folders += 1
-            child_files, child_folders = count_child_objects(service, item['id'])
-            total_files += child_files
-            total_folders += child_folders
+            nested_folders_count += 1
+            sub_child_objects, sub_nested_folders = get_child_objects(service, item['id'])
+            child_objects_count += sub_child_objects
+            nested_folders_count += sub_nested_folders
+    
+    return child_objects_count, nested_folders_count
 
-    return total_files, total_folders
-
+# Function to generate the report
 def generate_report(service, source_folder_id):
-    report = {}
-    query = f"'{source_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    query = f"'{source_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
     results = service.files().list(q=query, fields="files(id, name)").execute()
-    items = results.get('files', [])
-
+    top_level_folders = results.get('files', [])
+    
+    report = []
     total_nested_folders = 0
-
-    for item in items:
-        folder_id = item['id']
-        folder_name = item['name']
-        total_files, total_folders = count_child_objects(service, folder_id)
-        report[folder_name] = {
-            'total_files': total_files,
-            'total_folders': total_folders
-        }
-        total_nested_folders += total_folders
-
-    report['total_nested_folders'] = total_nested_folders
+    
+    for folder in top_level_folders:
+        child_objects_count, nested_folders_count = get_child_objects(service, folder['id'])
+        report.append({
+            'Folder Name': folder['name'],
+            'Folder ID': folder['id'],
+            'Total Files': child_objects_count,
+            'Total Nested Folders': nested_folders_count
+        })
+    
     return report
 
-def write_report_to_json(report, filename='Assessment2.json'):
-    with open(filename, 'w') as report_file:
-        json.dump(report, report_file, indent=4)
-
-def generate_and_write_report(source_folder_id, json_filename='Assessment2.json'):
-    creds = authenticate()
-    service = build('drive', 'v3', credentials=creds)
+def main():
+    source_folder_id = '1cpo-7jgKSMdde-QrEJGkGxN1QvYdzP9V'
+    service = authenticate()
     report = generate_report(service, source_folder_id)
-    write_report_to_json(report, json_filename)
+    
+    with open('Assessment2.json', 'w') as outfile:
+        json.dump(report, outfile, indent=4)
+    
+    print("Report has been written to Assessment2.json")
 
 if __name__ == '__main__':
-    source_folder_id = '1cpo-7jgKSMdde-QrEJGkGxN1QvYdzP9V'
-    generate_and_write_report(source_folder_id)
+    main()
