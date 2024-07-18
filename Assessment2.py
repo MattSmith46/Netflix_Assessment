@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 def authenticate():
     SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
     creds = None
-    
+    # The file token.pickle stores the user's access and refresh tokens, and is created automatically when the authorization flow completes for the first time.
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
