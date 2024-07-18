@@ -74,7 +74,7 @@ def main():
     with open('Assessment2.json', 'w') as outfile:
         json.dump(report, outfile, indent=4)
     
-    print("Report has been written to Assessment2.json")
+    print("Report saved to Assessment2.json")
 
 if __name__ == '__main__':
     main()
