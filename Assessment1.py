@@ -1,5 +1,6 @@
 import os
 import pickle
+import json
 import google.auth
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -26,7 +27,7 @@ def authenticate_gdrive():
 
     return creds
 
-def generate_drive_report(folder_id):
+def generate_drive_report(folder_id, output_file):
     creds = authenticate_gdrive()
     
     try:
@@ -48,17 +49,24 @@ def generate_drive_report(folder_id):
             else:
                 num_files += 1
         
-        report = (
-            f"Report for folder ID '{folder_id}':\n"
-            f"Total number of files: {num_files}\n"
-            f"Total number of folders: {num_folders}\n"
-        )
+        report = {
+            "folder_id": folder_id,
+            "num_files": num_files,
+            "num_folders": num_folders
+        }
         
-        return report
+        with open(output_file, 'w') as f:
+            json.dump(report, f, indent=4)
+        
+        return f"Report saved to {output_file}"
     except HttpError as error:
+        error_report = {"error": str(error)}
+        with open(output_file, 'w') as f:
+            json.dump(error_report, f, indent=4)
         return f"An error occurred: {error}"
 
-# Example usage
+# Generate Report
 folder_id = '1cpo-7jgKSMdde-QrEJGkGxN1QvYdzP9V'
-report = generate_drive_report(folder_id)
-print(report)
+output_file = 'Assessment1.json'
+message = generate_drive_report(folder_id, output_file)
+print(message)
