@@ -1,20 +1,16 @@
 from __future__ import print_function
 import os.path
 import json
-import io
 import google.auth
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 def authenticate():
-    """Shows basic usage of the Drive v3 API.
-    Prints the names and ids of the first 10 files the user has access to.
-    """
+
     creds = None
 
     if os.path.exists('token.json'):
@@ -72,14 +68,16 @@ def generate_report(service, source_folder_id):
     report['total_nested_folders'] = total_nested_folders
     return report
 
-def main():
+def write_report_to_json(report, filename='Assessment2.json'):
+    with open(filename, 'w') as report_file:
+        json.dump(report, report_file, indent=4)
+
+def generate_and_write_report(source_folder_id, json_filename='Assessment2.json'):
     creds = authenticate()
     service = build('drive', 'v3', credentials=creds)
-
-    source_folder_id = '1cpo-7jgKSMdde-QrEJGkGxN1QvYdzP9V'
     report = generate_report(service, source_folder_id)
-
-    print(json.dumps(report, indent=4))
+    write_report_to_json(report, json_filename)
 
 if __name__ == '__main__':
-    main()
+    source_folder_id = '1cpo-7jgKSMdde-QrEJGkGxN1QvYdzP9V'
+    generate_and_write_report(source_folder_id)
